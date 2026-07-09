@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ledger — Customer Payments</title>
+<title>SKJCN - Wifi Payments</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Noto+Sans+Telugu:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -14,8 +14,8 @@
     --ink-soft:#5B564B;
     --teal:#0F5E56;
     --teal-deep:#0A413C;
-    --stamp-red:#B23A2E;
-    --unpaid-amber:#B8863B;
+    --paid-green:#1E7D4F;
+    --unpaid-red:#B23A2E;
     --radius:10px;
   }
   *{box-sizing:border-box;}
@@ -64,7 +64,7 @@
     background:#9a9584;margin-right:6px;
   }
   .status.live .dot{background:var(--teal);}
-  .status.error .dot{background:var(--stamp-red);}
+  .status.error .dot{background:var(--unpaid-red);}
 
   .toolbar{
     display:flex;justify-content:space-between;align-items:center;
@@ -75,6 +75,20 @@
     font-size:13px;color:var(--ink-soft);
   }
   .summary b{color:var(--ink);}
+  .filters{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  }
+  .filters select{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px solid var(--ink);
+    border-radius:6px;
+    padding:0 10px;
+    height:30px;
+    cursor:pointer;
+  }
   button.refresh{
     font-family:'IBM Plex Mono',monospace;
     font-size:12px;
@@ -88,7 +102,7 @@
   }
   button.refresh:hover{background:var(--ink);color:var(--paper);}
 
-  table{width:100%;border-collapse:collapse;background:transparent;}
+  table{width:100%;border-collapse:collapse;background:transparent;table-layout:fixed;}
   thead th{
     text-align:left;
     font-family:'IBM Plex Mono',monospace;
@@ -114,7 +128,9 @@
     font-family:'Noto Sans Telugu','Inter',sans-serif;
     font-size:15.5px;
   }
-  td.price{font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap;}
+  td.price{font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap;font-weight:600;}
+  td.price.is-paid{color:var(--paid-green);}
+  td.price.is-unpaid{color:var(--unpaid-red);}
   td.trans{text-align:center;width:110px;}
 
   /* --- the signature element: a stamp-style paid toggle --- */
@@ -138,13 +154,13 @@
     font-family:'IBM Plex Mono',monospace;
     font-size:11px;
     letter-spacing:.08em;
-    color:var(--unpaid-amber);
+    color:var(--unpaid-red);
     text-transform:uppercase;
     transition:all .15s ease;
   }
   .stamp-toggle input:checked ~ .stamp-face{
-    border:2px solid var(--stamp-red);
-    color:var(--stamp-red);
+    border:2px solid var(--paid-green);
+    color:var(--paid-green);
     font-weight:600;
     transform:rotate(-6deg) scale(1.05);
     animation:stampdown .22s ease-out;
@@ -187,8 +203,7 @@
 
   <header>
     <div>
-      <p class="eyebrow">Customer Ledger</p>
-      <h1>Payments &amp; Packages</h1>
+      <h1>SKJCN - Wifi Payments</h1>
     </div>
     <div class="status" id="status"><span class="dot"></span><span id="statusText">connecting…</span></div>
   </header>
@@ -201,10 +216,26 @@
 
   <div class="toolbar">
     <div class="summary" id="summary">Loading…</div>
-    <button class="refresh" id="refreshBtn">↻ Refresh now</button>
+    <div class="filters">
+      <select id="monthFilter">
+        <option value="">All months</option>
+      </select>
+      <select id="yearFilter">
+        <option value="">All years</option>
+      </select>
+      <button class="refresh" id="refreshBtn">↻ Refresh now</button>
+    </div>
   </div>
 
   <table>
+    <colgroup>
+      <col style="width:6%">
+      <col style="width:13%">
+      <col style="width:27%">
+      <col style="width:22%">
+      <col style="width:10%">
+      <col style="width:22%">
+    </colgroup>
     <thead>
       <tr>
         <th class="center">#</th>
@@ -231,6 +262,7 @@
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpvsdsf6C1j6kUClUXNfK8CjCuNKpcK157N4oyFd4iADYAQGURILJvdQdcXj6osh3b/exec"; // e.g. "https://script.google.com/macros/s/AKfycb.../exec"
 
   const REFRESH_MS = 20000;
+  const MONTH_ORDER = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   const DEMO_ROWS = [
     {trans:"paid", date:"05-Jan-2026", cust_name:"అర్జున్ రెడ్డి", pack_name:"Gold Package", pack_price:4999, _row:2},
@@ -246,8 +278,11 @@
   const summaryEl = document.getElementById('summary');
   const setupBanner = document.getElementById('setupBanner');
   const refreshBtn = document.getElementById('refreshBtn');
+  const monthFilter = document.getElementById('monthFilter');
+  const yearFilter = document.getElementById('yearFilter');
 
-  let rowsCache = [];
+  let rowsCache = [];  // currently rendered (filtered) rows
+  let allRows = [];    // full unfiltered set from the last load
 
   function fmtPrice(v){
     const n = Number(v);
@@ -255,10 +290,66 @@
     return '₹' + n.toLocaleString('en-IN');
   }
 
+  // Expects dd-Mon-yyyy, e.g. "05-Jan-2026". Returns {day, month, year} or null.
+  function parseDMY(dateStr){
+    if (!dateStr) return null;
+    const parts = String(dateStr).trim().split('-');
+    if (parts.length !== 3) return null;
+    const [day, month, year] = parts;
+    if (!MONTH_ORDER.includes(month)) return null;
+    return { day, month, year };
+  }
+
+  function populateFilters(rows){
+    const years = new Set();
+    const months = new Set();
+    rows.forEach(r => {
+      const d = parseDMY(r.date);
+      if (d){ years.add(d.year); months.add(d.month); }
+    });
+
+    const sortedYears = Array.from(years).sort();
+    const sortedMonths = MONTH_ORDER.filter(m => months.has(m));
+
+    const prevYear = yearFilter.value;
+    const prevMonth = monthFilter.value;
+
+    yearFilter.innerHTML = '<option value="">All years</option>' +
+      sortedYears.map(y => `<option value="${y}">${y}</option>`).join('');
+    monthFilter.innerHTML = '<option value="">All months</option>' +
+      sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+
+    if (sortedYears.includes(prevYear)) yearFilter.value = prevYear;
+    if (sortedMonths.includes(prevMonth)) monthFilter.value = prevMonth;
+  }
+
+  function applyFilters(){
+    const y = yearFilter.value;
+    const m = monthFilter.value;
+    const filtered = allRows.filter(r => {
+      const d = parseDMY(r.date);
+      if (!d) return !y && !m; // undated rows only show when no filter is active
+      if (y && d.year !== y) return false;
+      if (m && d.month !== m) return false;
+      return true;
+    });
+    render(filtered);
+  }
+
   function render(rows){
+    // Display-only ordering: unpaid customers on top, paid below.
+    // This never touches the sheet — it's just how this page shows the rows.
+    rows = [...rows].sort((a, b) => {
+      const aPaid = String(a.trans).trim().toLowerCase() === 'paid' ? 1 : 0;
+      const bPaid = String(b.trans).trim().toLowerCase() === 'paid' ? 1 : 0;
+      return aPaid - bPaid;
+    });
     rowsCache = rows;
     if (!rows.length){
-      tbody.innerHTML = '<tr><td colspan="6" class="empty">No customers yet — add a row in the sheet.</td></tr>';
+      const filtered = yearFilter.value || monthFilter.value;
+      tbody.innerHTML = filtered
+        ? '<tr><td colspan="6" class="empty">No customers match that filter.</td></tr>'
+        : '<tr><td colspan="6" class="empty">No customers yet — add a row in the sheet.</td></tr>';
       summaryEl.innerHTML = 'No customers';
       return;
     }
@@ -270,7 +361,7 @@
           <td class="date">${r.date || ''}</td>
           <td class="name">${r.cust_name || ''}</td>
           <td>${r.pack_name || ''}</td>
-          <td class="price">${fmtPrice(r.pack_price)}</td>
+          <td class="price ${checked ? 'is-paid' : 'is-unpaid'}">${fmtPrice(r.pack_price)}</td>
           <td class="trans">
             <label class="stamp-toggle">
               <input type="checkbox" ${checked ? 'checked' : ''} data-row="${r._row}">
@@ -298,14 +389,18 @@
     if (!SCRIPT_URL){
       setupBanner.style.display = 'block';
       setStatus('', 'demo data (not connected)');
-      render(DEMO_ROWS);
+      allRows = DEMO_ROWS;
+      populateFilters(allRows);
+      applyFilters();
       return;
     }
     try{
       if (!silent) setStatus('', 'loading…');
       const res = await fetch(SCRIPT_URL, {method:'GET'});
       const data = await res.json();
-      render(data.rows || []);
+      allRows = data.rows || [];
+      populateFilters(allRows);
+      applyFilters();
       setStatus('live', 'connected · updated ' + new Date().toLocaleTimeString());
     }catch(err){
       setStatus('error', 'could not reach sheet');
@@ -332,9 +427,11 @@
         body: JSON.stringify({row: Number(row), checked: checked})
       });
       setStatus('live', 'saved · ' + new Date().toLocaleTimeString());
-      // refresh summary numbers against the local cache immediately
-      const r = rowsCache.find(x => String(x._row) === String(row));
-      if (r) r.trans = checked ? 'paid' : '';
+      // reflect the change locally immediately, in both the full and filtered sets
+      const rAll = allRows.find(x => String(x._row) === String(row));
+      if (rAll) rAll.trans = checked ? 'paid' : '';
+      const rFiltered = rowsCache.find(x => String(x._row) === String(row));
+      if (rFiltered) rFiltered.trans = checked ? 'paid' : '';
       render(rowsCache);
     }catch(err){
       setStatus('error', 'save failed — reverting');
@@ -346,6 +443,8 @@
   }
 
   refreshBtn.addEventListener('click', () => loadData(false));
+  monthFilter.addEventListener('change', applyFilters);
+  yearFilter.addEventListener('change', applyFilters);
   loadData(false);
   setInterval(() => loadData(true), REFRESH_MS);
 </script>
