@@ -173,6 +173,80 @@
   .stamp-face::before{content:"UNPAID";}
   .stamp-toggle input:checked ~ .stamp-face::before{content:"✓ PAID";}
 
+  /* ============================================================
+     Mobile card layout — below 680px the table rows become
+     flex/grid "cards", one customer per card:
+       row 1: # . Name          (aside each other)
+       row 2: Date              (left)
+       row 3: Package ; Price   (aside each other, semicolon between)
+       right column (full height): Paid / Unpaid stamp
+     ============================================================ */
+  @media (max-width: 680px){
+    table{table-layout:auto;}
+    colgroup{display:none;}
+    thead{display:none;}
+    table, tbody{display:block;width:100%;}
+    tbody tr{
+      display:grid;
+      grid-template-columns:auto 1fr auto auto;
+      grid-template-rows:auto auto auto;
+      grid-template-areas:
+        "num  name  name  trans"
+        "date date  date  trans"
+        ".    pack  price trans";
+      column-gap:8px;
+      row-gap:6px;
+      align-items:center;
+      padding:16px 4px;
+      border-bottom:1px solid var(--paper-line);
+    }
+    tbody tr td{
+      display:block;
+      padding:0;
+      border:none;
+      font-size:14px;
+      white-space:normal;
+    }
+    td.num{
+      grid-area:num;
+      width:auto;
+      font-family:'IBM Plex Mono',monospace;
+      font-weight:600;
+      color:var(--ink);
+    }
+    td.num::after{content:".";}
+    td.name{
+      grid-area:name;
+      font-size:16px;
+    }
+    td.date{
+      grid-area:date;
+      font-size:12.5px;
+    }
+    td.pack{
+      grid-area:pack;
+      color:var(--ink-soft);
+      font-size:13.5px;
+    }
+    td.price{
+      grid-area:price;
+      text-align:left;
+      font-size:13.5px;
+      white-space:nowrap;
+    }
+    td.price::before{
+      content:";";
+      margin-right:6px;
+      color:var(--ink-soft);
+      font-weight:400;
+    }
+    td.trans{
+      grid-area:trans;
+      align-self:center;
+      width:auto;
+    }
+  }
+
   .empty, .loading{
     padding:40px 10px;text-align:center;color:var(--ink-soft);
     font-family:'IBM Plex Mono',monospace;font-size:13px;
@@ -360,7 +434,7 @@
           <td class="num">${i+1}</td>
           <td class="date">${r.date || ''}</td>
           <td class="name">${r.cust_name || ''}</td>
-          <td>${r.pack_name || ''}</td>
+          <td class="pack">${r.pack_name || ''}</td>
           <td class="price ${checked ? 'is-paid' : 'is-unpaid'}">${fmtPrice(r.pack_price)}</td>
           <td class="trans">
             <label class="stamp-toggle">
