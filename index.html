@@ -91,14 +91,20 @@
   }
   button.refresh{
     font-family:'IBM Plex Mono',monospace;
-    font-size:12px;
+    font-size:16px;
     background:transparent;
-    border:1px solid var(--ink);
+    border:3px solid var(--ink);
     color:var(--ink);
-    padding:8px 14px;
+    width:36px;
+    height:36px;
+    padding:0;
     border-radius:6px;
     cursor:pointer;
     letter-spacing:.03em;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
   }
   button.refresh:hover{background:var(--ink);color:var(--paper);}
 
@@ -323,12 +329,12 @@
     <div class="summary" id="summary">Loading…</div>
     <div class="filters">
       <select id="monthFilter">
-        <option value="">All months</option>
+        <option value="">నెలలు</option>
       </select>
       <select id="yearFilter">
-        <option value="">All years</option>
+        <option value="">సంవత్సరం</option>
       </select>
-      <button class="refresh" id="refreshBtn">↻ Refresh now</button>
+      <button class="refresh" id="refreshBtn" aria-label="Refresh now" title="Refresh now">↻</button>
     </div>
   </div>
 
@@ -419,9 +425,9 @@
     const prevYear = yearFilter.value;
     const prevMonth = monthFilter.value;
 
-    yearFilter.innerHTML = '<option value="">All years</option>' +
+    yearFilter.innerHTML = '<option value="">సంవత్సరం</option>' +
       sortedYears.map(y => `<option value="${y}">${y}</option>`).join('');
-    monthFilter.innerHTML = '<option value="">All months</option>' +
+    monthFilter.innerHTML = '<option value="">నెలలు</option>' +
       sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
 
     if (sortedYears.includes(prevYear)) yearFilter.value = prevYear;
