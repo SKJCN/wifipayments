@@ -192,12 +192,19 @@
     h1{font-size:28px;}
     header{padding-bottom:14px;margin-bottom:22px;}
     .toolbar{margin-bottom:12px;}
-    table{table-layout:auto;}
+    table{table-layout:fixed;}
+    colgroup col:nth-child(1){display:none;}
+    colgroup col:nth-child(2){width:15%;}
+    colgroup col:nth-child(3){width:36%;}
+    colgroup col:nth-child(4){width:15%;}
+    colgroup col:nth-child(5){width:14%;}
+    colgroup col:nth-child(6){width:20%;}
     thead th{font-size:10.5px;padding:0 8px 8px;}
     tbody td{padding:11px 8px;font-size:13.5px;}
     td.name{font-size:14.5px;}
     .stamp-toggle{width:78px;height:36px;}
     .stamp-face{font-size:10px;}
+    thead th:nth-child(1), tbody td:nth-child(1){display:none;}
   }
 
   @media (max-width: 680px){
@@ -207,11 +214,11 @@
     table, tbody{display:block;width:100%;}
     tbody tr{
       display:grid;
-      grid-template-columns:auto auto auto auto 1fr;
+      grid-template-columns:auto auto auto 1fr;
       grid-template-rows:auto auto;
       grid-template-areas:
-        "date num  name  .     trans"
-        "date .    pack  price trans";
+        "date name  .     trans"
+        "date pack  price trans";
       column-gap:10px;
       row-gap:6px;
       align-items:center;
@@ -226,13 +233,8 @@
       white-space:normal;
     }
     td.num{
-      grid-area:num;
-      width:auto;
-      font-family:'IBM Plex Mono',monospace;
-      font-weight:600;
-      color:var(--ink);
+      display:none;
     }
-    td.num::after{content:".";}
     td.name{
       grid-area:name;
       font-size:16px;
