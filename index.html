@@ -288,6 +288,87 @@
     padding:40px 10px;text-align:center;color:var(--ink-soft);
     font-family:'IBM Plex Mono',monospace;font-size:13px;
   }
+
+  /* ---- Hidden (paid & tucked away) customers, behind an icon at the bottom ---- */
+  .hidden-section{
+    margin-top:36px;
+    padding-top:20px;
+    border-top:2px dashed var(--paper-line);
+    text-align:center;
+  }
+  .hidden-toggle-btn{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    background:transparent;
+    border:1.5px solid var(--ink);
+    color:var(--ink);
+    padding:9px 16px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .15s ease,color .15s ease;
+  }
+  .hidden-toggle-btn:hover{background:var(--ink);color:var(--paper);}
+  .hidden-icon{width:16px;height:16px;flex:none;}
+  .hidden-badge{
+    background:var(--teal);
+    color:#fff;
+    font-size:11px;
+    font-weight:600;
+    min-width:18px;height:18px;
+    padding:0 5px;
+    border-radius:999px;
+    display:inline-flex;align-items:center;justify-content:center;
+    line-height:1;
+  }
+  .hidden-toggle-btn:hover .hidden-badge{background:var(--paper);color:var(--teal);}
+  .hidden-chevron{display:inline-block;font-size:10px;transition:transform .15s ease;}
+  .hidden-toggle-btn.open .hidden-chevron{transform:rotate(180deg);}
+  .hidden-panel{margin-top:16px;text-align:left;}
+
+  .hidden-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  table.hidden-table{width:100%;border-collapse:collapse;opacity:.82;}
+  table.hidden-table td{
+    padding:10px 10px;
+    border-bottom:1px solid var(--paper-line);
+    font-size:13.5px;
+    vertical-align:middle;
+    color:var(--ink-soft);
+  }
+  table.hidden-table td.name{
+    font-family:'Noto Sans Telugu','Inter',sans-serif;
+    color:var(--ink);
+    font-weight:500;
+  }
+  table.hidden-table td.price{
+    font-family:'IBM Plex Mono',monospace;
+    text-align:right;white-space:nowrap;font-weight:600;
+    color:var(--paid-green);
+  }
+
+  @media (max-width: 680px){
+    table.hidden-table, table.hidden-table tbody{display:block;width:100%;}
+    table.hidden-table tr{
+      display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+      gap:4px 12px;
+      padding:12px 4px;
+      border-bottom:1px solid var(--paper-line);
+    }
+    table.hidden-table td{display:inline-block;padding:0;border:none;font-size:13px;}
+    table.hidden-table td.date{width:100%;order:1;font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
+    table.hidden-table td.name{order:2;font-size:14px;}
+    table.hidden-table td.pack{order:3;color:var(--ink-soft);font-size:12.5px;}
+    table.hidden-table td.price{order:4;}
+    table.hidden-table td.trans{order:5;width:100%;text-align:left;margin-top:4px;}
+  }
   .setup-banner{
     background:#FBF6E9;
     border:1px solid #E8DDB0;
@@ -362,7 +443,24 @@
     </tbody>
   </table>
 
-  <footer>Auto-refreshes every 20s · toggling a checkbox writes straight back to your Google Sheet</footer>
+  <div class="hidden-section" id="hiddenSection" style="display:none">
+    <button type="button" class="hidden-toggle-btn" id="hiddenToggleBtn" aria-expanded="false">
+      <svg class="hidden-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.6"/>
+      </svg>
+      <span>Hidden · Paid</span>
+      <span class="hidden-badge" id="hiddenCount">0</span>
+      <span class="hidden-chevron">▾</span>
+    </button>
+    <div class="hidden-panel" id="hiddenPanel" hidden>
+      <table class="hidden-table">
+        <tbody id="hiddenBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>Auto-refreshes every 20s · toggling a checkbox writes straight back to your Google Sheet · marking "paid" tucks a customer behind the icon below — untick it there to bring them back</footer>
 </div>
 
 <script>
@@ -391,6 +489,12 @@
   const refreshBtn = document.getElementById('refreshBtn');
   const monthFilter = document.getElementById('monthFilter');
   const yearFilter = document.getElementById('yearFilter');
+  const hiddenSection = document.getElementById('hiddenSection');
+  const hiddenToggleBtn = document.getElementById('hiddenToggleBtn');
+  const hiddenPanel = document.getElementById('hiddenPanel');
+  const hiddenBody = document.getElementById('hiddenBody');
+  const hiddenCountEl = document.getElementById('hiddenCount');
+  let hiddenPanelOpen = false;
 
   let rowsCache = [];  // currently rendered (filtered) rows
   let allRows = [];    // full unfiltered set from the last load
@@ -462,34 +566,82 @@
         ? '<tr><td colspan="6" class="empty">No customers match that filter.</td></tr>'
         : '<tr><td colspan="6" class="empty">No customers yet — add a row in the sheet.</td></tr>';
       summaryEl.innerHTML = 'No customers';
+      renderHiddenSection([]);
       return;
     }
-    tbody.innerHTML = rows.map((r, i) => {
-      const checked = String(r.trans).trim().toLowerCase() === 'paid';
-      return `
-        <tr data-row="${r._row}">
-          <td class="num">${i+1}</td>
-          <td class="date">${r.date || ''}</td>
-          <td class="name">${r.cust_name || ''}</td>
-          <td class="pack">${r.pack_name || ''}</td>
-          <td class="price ${checked ? 'is-paid' : 'is-unpaid'}">${fmtPrice(r.pack_price)}</td>
-          <td class="trans">
-            <label class="stamp-toggle">
-              <input type="checkbox" ${checked ? 'checked' : ''} data-row="${r._row}">
-              <span class="stamp-face"></span>
-            </label>
-          </td>
-        </tr>`;
-    }).join('');
+
+    // Main list = unpaid. Paid customers move behind the "Hidden · Paid" icon.
+    const visibleRows = rows.filter(r => String(r.trans).trim().toLowerCase() !== 'paid');
+    const hiddenList = rows.filter(r => String(r.trans).trim().toLowerCase() === 'paid');
+
+    if (!visibleRows.length){
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">Everyone here is paid — check the icon below.</td></tr>';
+    } else {
+      tbody.innerHTML = visibleRows.map((r, i) => {
+        const checked = String(r.trans).trim().toLowerCase() === 'paid';
+        return `
+          <tr data-row="${r._row}">
+            <td class="num">${i+1}</td>
+            <td class="date">${r.date || ''}</td>
+            <td class="name">${r.cust_name || ''}</td>
+            <td class="pack">${r.pack_name || ''}</td>
+            <td class="price ${checked ? 'is-paid' : 'is-unpaid'}">${fmtPrice(r.pack_price)}</td>
+            <td class="trans">
+              <label class="stamp-toggle">
+                <input type="checkbox" ${checked ? 'checked' : ''} data-row="${r._row}">
+                <span class="stamp-face"></span>
+              </label>
+            </td>
+          </tr>`;
+      }).join('');
+      tbody.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', onToggle);
+      });
+    }
 
     const paidCount = rows.filter(r => String(r.trans).trim().toLowerCase() === 'paid').length;
     const totalPaid = rows.reduce((sum, r) => String(r.trans).trim().toLowerCase() === 'paid' ? sum + Number(r.pack_price || 0) : sum, 0);
     summaryEl.innerHTML = `<b>${rows.length}</b> customers · <b>${paidCount}</b> paid · <b>${fmtPrice(totalPaid)}</b> collected`;
 
-    tbody.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    renderHiddenSection(hiddenList);
+  }
+
+  function renderHiddenSection(hiddenList){
+    if (!hiddenList.length){
+      hiddenSection.style.display = 'none';
+      hiddenBody.innerHTML = '';
+      return;
+    }
+    hiddenSection.style.display = 'block';
+    hiddenCountEl.textContent = hiddenList.length;
+    hiddenBody.innerHTML = hiddenList.map(r => `
+      <tr data-row="${r._row}">
+        <td class="date">${r.date || ''}</td>
+        <td class="name">${r.cust_name || ''}</td>
+        <td class="pack">${r.pack_name || ''}</td>
+        <td class="price is-paid">${fmtPrice(r.pack_price)}</td>
+        <td class="trans">
+          <label class="stamp-toggle">
+            <input type="checkbox" checked data-row="${r._row}">
+            <span class="stamp-face"></span>
+          </label>
+        </td>
+      </tr>`).join('');
+
+    hiddenBody.querySelectorAll('input[type=checkbox]').forEach(cb => {
       cb.addEventListener('change', onToggle);
     });
+
+    // re-renders (e.g. from the 20s auto-refresh) shouldn't snap the panel shut on the user
+    hiddenPanel.hidden = !hiddenPanelOpen;
   }
+
+  hiddenToggleBtn.addEventListener('click', () => {
+    hiddenPanelOpen = !hiddenPanelOpen;
+    hiddenPanel.hidden = !hiddenPanelOpen;
+    hiddenToggleBtn.setAttribute('aria-expanded', String(hiddenPanelOpen));
+    hiddenToggleBtn.classList.toggle('open', hiddenPanelOpen);
+  });
 
   function setStatus(mode, text){
     statusEl.className = 'status ' + mode;
