@@ -636,11 +636,43 @@
     hiddenPanel.hidden = !hiddenPanelOpen;
   }
 
+  const HIDDEN_AUTOCLOSE_MS = 5000;
+  let hiddenAutoCloseTimer = null;
+
+  function scheduleHiddenAutoClose(){
+    clearTimeout(hiddenAutoCloseTimer);
+    hiddenAutoCloseTimer = setTimeout(closeHiddenPanel, HIDDEN_AUTOCLOSE_MS);
+  }
+
+  function onHiddenActivity(){
+    if (hiddenPanelOpen) scheduleHiddenAutoClose();
+  }
+
+  function openHiddenPanel(){
+    hiddenPanelOpen = true;
+    hiddenPanel.hidden = false;
+    hiddenToggleBtn.setAttribute('aria-expanded', 'true');
+    hiddenToggleBtn.classList.add('open');
+    scheduleHiddenAutoClose();
+    window.addEventListener('scroll', onHiddenActivity, {passive:true});
+    document.addEventListener('click', onHiddenActivity);
+    document.addEventListener('touchstart', onHiddenActivity, {passive:true});
+  }
+
+  function closeHiddenPanel(){
+    hiddenPanelOpen = false;
+    hiddenPanel.hidden = true;
+    hiddenToggleBtn.setAttribute('aria-expanded', 'false');
+    hiddenToggleBtn.classList.remove('open');
+    clearTimeout(hiddenAutoCloseTimer);
+    window.removeEventListener('scroll', onHiddenActivity);
+    document.removeEventListener('click', onHiddenActivity);
+    document.removeEventListener('touchstart', onHiddenActivity);
+  }
+
   hiddenToggleBtn.addEventListener('click', () => {
-    hiddenPanelOpen = !hiddenPanelOpen;
-    hiddenPanel.hidden = !hiddenPanelOpen;
-    hiddenToggleBtn.setAttribute('aria-expanded', String(hiddenPanelOpen));
-    hiddenToggleBtn.classList.toggle('open', hiddenPanelOpen);
+    if (hiddenPanelOpen) closeHiddenPanel();
+    else openHiddenPanel();
   });
 
   function setStatus(mode, text){
