@@ -470,7 +470,7 @@
     </div>
   </div>
 
-  <footer>Auto-refreshes every 20s · toggling a checkbox writes straight back to your Google Sheet · marking "paid" tucks a customer behind the icon below — untick it there to bring them back</footer>
+  <footer>Auto-refreshes every 20s · toggling a checkbox writes straight back to your Google Sheet · marking "paid" tucks a customer behind the icon below — untick it there to bring them back · unpaid customers always show; paid customers from earlier months only reappear when you pick that month/year in the filter above</footer>
 </div>
 
 <script>
@@ -555,15 +555,43 @@
     if (sortedMonths.includes(prevMonth)) monthFilter.value = prevMonth;
   }
 
+  // Current month/year, used as the default view for paid customers when
+  // no filter is explicitly chosen.
+  function currentMonthYear(){
+    const now = new Date();
+    return { month: MONTH_ORDER[now.getMonth()], year: String(now.getFullYear()) };
+  }
+
   function applyFilters(){
     const y = yearFilter.value;
     const m = monthFilter.value;
+    const usingFilter = !!(y || m); // true once the user has picked a month and/or year
+    const cur = currentMonthYear();
+
     const filtered = allRows.filter(r => {
+      const isPaid = String(r.trans).trim().toLowerCase() === 'paid';
+
+      // Unpaid customers are never touched by the month/year filter —
+      // they always show, in every filter state.
+      if (!isPaid) return true;
+
+      // Paid customers ARE governed by the filter.
       const d = parseDMY(r.date);
-      if (!d) return !y && !m; // undated rows only show when no filter is active
-      if (y && d.year !== y) return false;
-      if (m && d.month !== m) return false;
-      return true;
+      if (usingFilter){
+        // User explicitly picked a month and/or year: show only paid
+        // customers matching that selection (this is the only way to
+        // bring back paid customers from previous months).
+        if (!d) return false;
+        if (y && d.year !== y) return false;
+        if (m && d.month !== m) return false;
+        return true;
+      } else {
+        // No filter chosen: default view. Only show paid customers from
+        // the current real-world month — older paid customers disappear
+        // until the user filters for them.
+        if (!d) return false;
+        return d.month === cur.month && d.year === cur.year;
+      }
     });
     render(filtered);
   }
