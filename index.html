@@ -484,11 +484,11 @@
   const MONTH_ORDER = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   const DEMO_ROWS = [
-    {trans:"paid", date:"05-Jan-2026", cust_name:"అర్జున్ రెడ్డి", pack_name:"Gold Package", pack_price:4999, _row:2},
-    {trans:"", date:"07-Jan-2026", cust_name:"ప్రియా నాయుడు", pack_name:"Silver Package", pack_price:2999, _row:3},
-    {trans:"paid", date:"09-Jan-2026", cust_name:"వెంకటేష్ రావు", pack_name:"Platinum Package", pack_price:7999, _row:4},
-    {trans:"", date:"10-Jan-2026", cust_name:"దివ్య చౌదరి", pack_name:"Basic Package", pack_price:1499, _row:5},
-    {trans:"paid", date:"12-Jan-2026", cust_name:"కార్తీక్ వర్మ", pack_name:"Gold Package", pack_price:4999, _row:6}
+    {trans:"paid", date:"05-Jan-2026", cust_name:"అర్జున్ రెడ్డి", pack_name:"Gold Package", pack_price:4999, _row:2, _sheet:"Jan2026", _month:"Jan", _year:"2026"},
+    {trans:"", date:"07-Jan-2026", cust_name:"ప్రియా నాయుడు", pack_name:"Silver Package", pack_price:2999, _row:3, _sheet:"Jan2026", _month:"Jan", _year:"2026"},
+    {trans:"paid", date:"09-Jan-2026", cust_name:"వెంకటేష్ రావు", pack_name:"Platinum Package", pack_price:7999, _row:4, _sheet:"Jan2026", _month:"Jan", _year:"2026"},
+    {trans:"", date:"10-Jan-2026", cust_name:"దివ్య చౌదరి", pack_name:"Basic Package", pack_price:1499, _row:5, _sheet:"Jan2026", _month:"Jan", _year:"2026"},
+    {trans:"paid", date:"12-Jan-2026", cust_name:"కార్తీక్ వర్మ", pack_name:"Gold Package", pack_price:4999, _row:6, _sheet:"Jan2026", _month:"Jan", _year:"2026"}
   ];
 
   const tbody = document.getElementById('tbody');
@@ -536,8 +536,10 @@
     const years = new Set();
     const months = new Set();
     rows.forEach(r => {
-      const d = parseDMY(r.date);
-      if (d){ years.add(d.year); months.add(d.month); }
+      // Month/year now come from which sheet the row lives on (set by
+      // Code.gs from the sheet's name), not from the date column.
+      if (r._year) years.add(r._year);
+      if (r._month) months.add(r._month);
     });
 
     const sortedYears = Array.from(years).sort();
@@ -575,22 +577,21 @@
       // they always show, in every filter state.
       if (!isPaid) return true;
 
-      // Paid customers ARE governed by the filter.
-      const d = parseDMY(r.date);
+      // Paid customers ARE governed by the filter — using the month/year
+      // that Code.gs derived from the SHEET NAME they came from, not the
+      // date column.
       if (usingFilter){
         // User explicitly picked a month and/or year: show only paid
-        // customers matching that selection (this is the only way to
-        // bring back paid customers from previous months).
-        if (!d) return false;
-        if (y && d.year !== y) return false;
-        if (m && d.month !== m) return false;
+        // customers whose sheet matches that selection (this is the only
+        // way to bring back paid customers from earlier months' sheets).
+        if (y && r._year !== y) return false;
+        if (m && r._month !== m) return false;
         return true;
       } else {
-        // No filter chosen: default view. Only show paid customers from
-        // the current real-world month — older paid customers disappear
-        // until the user filters for them.
-        if (!d) return false;
-        return d.month === cur.month && d.year === cur.year;
+        // No filter chosen: default view. Only show paid customers whose
+        // sheet is the current real-world month — older sheets' paid
+        // customers disappear until the user filters for them.
+        return r._month === cur.month && r._year === cur.year;
       }
     });
     render(filtered);
@@ -633,7 +634,7 @@
             <td class="price ${checked ? 'is-paid' : 'is-unpaid'}">${fmtPrice(r.pack_price)}</td>
             <td class="trans">
               <label class="stamp-toggle">
-                <input type="checkbox" ${checked ? 'checked' : ''} data-row="${r._row}">
+                <input type="checkbox" ${checked ? 'checked' : ''} data-row="${r._row}" data-sheet="${r._sheet || ''}">
                 <span class="stamp-face"></span>
               </label>
             </td>
@@ -667,7 +668,7 @@
         <td class="price is-paid">${fmtPrice(r.pack_price)}</td>
         <td class="trans">
           <label class="stamp-toggle">
-            <input type="checkbox" checked data-row="${r._row}">
+            <input type="checkbox" checked data-row="${r._row}" data-sheet="${r._sheet || ''}">
             <span class="stamp-face"></span>
           </label>
         </td>
@@ -751,6 +752,7 @@
   async function onToggle(e){
     const cb = e.target;
     const row = cb.dataset.row;
+    const sheet = cb.dataset.sheet || '';
     const checked = cb.checked;
 
     if (!SCRIPT_URL){
@@ -764,13 +766,14 @@
       await fetch(SCRIPT_URL, {
         method: 'POST',
         headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({row: Number(row), checked: checked})
+        body: JSON.stringify({sheet: sheet, row: Number(row), checked: checked})
       });
       setStatus('live', 'saved · ' + new Date().toLocaleTimeString());
-      // reflect the change locally immediately, in both the full and filtered sets
-      const rAll = allRows.find(x => String(x._row) === String(row));
+      // reflect the change locally immediately, in both the full and filtered sets.
+      // Match on row + sheet together, since row numbers repeat across sheets.
+      const rAll = allRows.find(x => String(x._row) === String(row) && x._sheet === sheet);
       if (rAll) rAll.trans = checked ? 'paid' : '';
-      const rFiltered = rowsCache.find(x => String(x._row) === String(row));
+      const rFiltered = rowsCache.find(x => String(x._row) === String(row) && x._sheet === sheet);
       if (rFiltered) rFiltered.trans = checked ? 'paid' : '';
       render(rowsCache);
     }catch(err){
