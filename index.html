@@ -398,6 +398,73 @@
     margin-top:30px;text-align:center;
     font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);
   }
+
+  [hidden]{display:none !important;}
+
+  /* ---- Page tabs ---- */
+  .tabs{display:flex;gap:4px;margin:-10px 0 22px;border-bottom:1px solid var(--paper-line);}
+  .tab{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+    background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-1px;
+    padding:10px 16px;color:var(--ink-soft);cursor:pointer;
+  }
+  .tab:hover{color:var(--ink);}
+  .tab[aria-selected="true"]{color:var(--teal-deep);border-bottom-color:var(--teal);font-weight:600;}
+
+  /* ---- Customers page ---- */
+  .cust-search{
+    height:30px;min-width:190px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);
+    background:var(--paper);border:1px solid var(--ink);border-radius:6px;padding:0 10px;
+  }
+  .cust-list{display:flex;flex-direction:column;}
+  .cust-card{
+    display:grid;grid-template-columns:1fr auto;gap:10px 20px;align-items:center;
+    padding:16px 4px;border-bottom:1px solid var(--paper-line);
+  }
+  .cust-name{font-family:'Noto Sans Telugu','Inter',sans-serif;font-size:18.5px;font-weight:500;}
+  .cust-details{display:flex;flex-wrap:wrap;gap:2px 16px;margin-top:4px;font-size:12.5px;color:var(--ink-soft);}
+  .cust-details b{
+    font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:10.5px;letter-spacing:.06em;
+    text-transform:uppercase;margin-right:5px;
+  }
+  .cust-chip-row{margin-top:8px;}
+  .chip{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.03em;
+    padding:3px 9px;border-radius:999px;border:1px solid;
+  }
+  .chip.ok{color:var(--teal-deep);border-color:var(--teal);}
+  .chip.lock{color:var(--ink-soft);border-color:var(--paper-line);background:rgba(0,0,0,.03);}
+  .cust-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+  .cust-card.is-locked .cust-controls{opacity:.5;}
+  .cust-controls input[type=date], .cust-controls select{
+    height:34px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);
+    background:var(--paper);border:1px solid var(--ink);border-radius:6px;padding:0 8px;
+  }
+  .cust-controls select{max-width:170px;}
+  .cust-controls :disabled{cursor:not-allowed;}
+  .cust-btn{
+    height:34px;padding:0 16px;background:var(--teal);color:#fff;border:none;border-radius:6px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
+  }
+  .cust-btn:hover:not(:disabled){background:var(--teal-deep);}
+  .cust-btn:disabled{background:var(--paper-line);color:var(--ink-soft);}
+  .cust-msg{width:100%;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--unpaid-red);min-height:0;}
+  .cust-msg:empty{display:none;}
+  @media (max-width:680px){
+    .cust-card{grid-template-columns:1fr;}
+    .cust-controls{justify-content:flex-start;}
+    .cust-msg{text-align:left;}
+    .cust-search{min-width:0;flex:1;}
+  }
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.4;max-width:90vw;
+    opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--unpaid-red);}
 </style>
 </head>
 <body>
@@ -416,6 +483,12 @@
     <code>&lt;script&gt;</code> tag in this file, then reload. See <code>SETUP_INSTRUCTIONS.md</code> for the full walkthrough.
   </div>
 
+  <nav class="tabs" role="tablist">
+    <button type="button" class="tab" role="tab" data-view="payments" aria-selected="true">Payments</button>
+    <button type="button" class="tab" role="tab" data-view="customers" aria-selected="false">Customers</button>
+  </nav>
+
+  <section id="view-payments">
   <div class="toolbar">
     <div class="summary" id="summary">Loading…</div>
     <div class="filters">
@@ -469,9 +542,23 @@
       </table>
     </div>
   </div>
+  </section>
 
-  <footer>Auto-refreshes every 20s · toggling a checkbox writes straight back to your Google Sheet · marking "paid" tucks a customer behind the icon below — untick it there to bring them back · unpaid customers always show; paid customers from earlier months only reappear when you pick that month/year in the filter above</footer>
+  <section id="view-customers" hidden>
+    <div class="toolbar">
+      <div class="summary" id="custSummary">Loading…</div>
+      <div class="filters">
+        <input type="search" id="custSearch" class="cust-search" placeholder="Search customers…" autocomplete="off">
+        <button class="refresh" id="custRefreshBtn" aria-label="Refresh now" title="Refresh now">↻</button>
+      </div>
+    </div>
+    <div class="cust-list" id="custList"><div class="loading">Loading customers…</div></div>
+  </section>
+
+  <footer>Auto-refreshes every 20s · toggling a checkbox writes straight back to your Google Sheet · marking "paid" tucks a customer behind the icon below — untick it there to bring them back · unpaid customers always show; paid customers from earlier months only reappear when you pick that month/year in the filter above · Customers tab: pick a date and pack, press Subscribe — it adds an unpaid row to that month's sheet and locks the customer for 30 days</footer>
 </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
   // ============================================================
@@ -489,6 +576,12 @@
     {trans:"paid", date:"09-Jan-2026", cust_name:"వెంకటేష్ రావు", pack_name:"Platinum Package", pack_price:7999, _row:4, _sheet:"Jan2026", _month:"Jan", _year:"2026"},
     {trans:"", date:"10-Jan-2026", cust_name:"దివ్య చౌదరి", pack_name:"Basic Package", pack_price:1499, _row:5, _sheet:"Jan2026", _month:"Jan", _year:"2026"},
     {trans:"paid", date:"12-Jan-2026", cust_name:"కార్తీక్ వర్మ", pack_name:"Gold Package", pack_price:4999, _row:6, _sheet:"Jan2026", _month:"Jan", _year:"2026"}
+  ];
+
+  const DEMO_PACKS = [
+    {pack_name:"50Mbps", pack_price:800},
+    {pack_name:"100Mbps", pack_price:1200},
+    {pack_name:"200Mbps", pack_price:1800}
   ];
 
   const tbody = document.getElementById('tbody');
@@ -522,14 +615,14 @@
     return `${d.day}-${d.month}<br>${d.year}`;
   }
 
-  // Expects dd-Mon-yyyy, e.g. "05-Jan-2026". Returns {day, month, year} or null.
+  // Accepts dd-Mon-yyyy ("05-Jan-2026") and also "5 Jan 2026". Returns {day, month, year} or null.
   function parseDMY(dateStr){
     if (!dateStr) return null;
-    const parts = String(dateStr).trim().split('-');
-    if (parts.length !== 3) return null;
-    const [day, month, year] = parts;
-    if (!MONTH_ORDER.includes(month)) return null;
-    return { day, month, year };
+    const m = String(dateStr).trim().match(/^(\d{1,2})[-\s\/.]([A-Za-z]{3,})[-\s\/.,]*(\d{4})$/);
+    if (!m) return null;
+    const month = MONTH_ORDER.find(x => x.toLowerCase() === m[2].slice(0, 3).toLowerCase());
+    if (!month) return null;
+    return { day: m[1].padStart(2, '0'), month, year: m[3] };
   }
 
   function populateFilters(rows){
@@ -731,8 +824,13 @@
       setupBanner.style.display = 'block';
       setStatus('', 'demo data (not connected)');
       allRows = DEMO_ROWS;
+      packs = DEMO_PACKS;
+      customers = demoCustomers();
+      customersFound = true;
+      customersLoaded = true;
       populateFilters(allRows);
       applyFilters();
+      renderCustomers(false);
       return;
     }
     try{
@@ -740,8 +838,14 @@
       const res = await fetch(SCRIPT_URL, {method:'GET'});
       const data = await res.json();
       allRows = data.rows || [];
+      customers = data.customers || [];
+      packs = data.packs || [];
+      customersFound = data.customers_found !== false;
+      lockDays = data.lock_days || 30;
+      customersLoaded = true;
       populateFilters(allRows);
       applyFilters();
+      renderCustomers(false);
       setStatus('live', 'connected · updated ' + new Date().toLocaleTimeString());
     }catch(err){
       setStatus('error', 'could not reach sheet');
@@ -784,6 +888,212 @@
       cb.disabled = false;
     }
   }
+
+  // ============================================================
+  // Customers page — master list + Subscribe.
+  // Subscribe adds an unpaid row to that month's payment sheet and
+  // locks the customer for lockDays (the server enforces this too).
+  // ============================================================
+  const custList = document.getElementById('custList');
+  const custSummary = document.getElementById('custSummary');
+  const custSearchEl = document.getElementById('custSearch');
+  const custRefreshBtn = document.getElementById('custRefreshBtn');
+  const toastEl = document.getElementById('toast');
+
+  let customers = [];
+  let packs = [];
+  let customersFound = true;
+  let customersLoaded = false;
+  let lockDays = 30;
+  let custSig = '';
+  const drafts = {};   // per-customer date/pack the user picked but hasn't saved yet
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function todayIso(){ const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+  function isoToDay(iso){ const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m-1, d) / 86400000); }
+  function addDaysIso(iso, n){ const d = new Date((isoToDay(iso) + n) * 86400000); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`; }
+  function fmtIso(iso){ if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}-${MONTH_ORDER[+m - 1]}-${y}`; }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function keyOf(name){ const s = String(name == null ? '' : name).replace(/\s+/g, ' ').trim(); return s.normalize ? s.normalize('NFC') : s; }
+  function findPack(name){ const k = keyOf(name).toLowerCase(); return k ? packs.find(p => keyOf(p.pack_name).toLowerCase() === k) : undefined; }
+  function isLocked(c, today){ return !!c._next && today < c._next; }
+
+  // Sample customers for demo mode (no sheet connected)
+  function demoCustomers(){
+    const t = todayIso();
+    return [
+      {cust_name:"అర్జున్ రెడ్డి", phone:"9000000001", address:"Main Road", pack_name:"100Mbps", _last:"", _last_pack:"", _next:""},
+      {cust_name:"ప్రియా నాయుడు", phone:"9000000002", address:"Temple Street", pack_name:"50Mbps", _last:"", _last_pack:"", _next:""},
+      {cust_name:"వెంకటేష్ రావు", phone:"9000000003", address:"Market Road", pack_name:"200Mbps", _last:addDaysIso(t,-10), _last_pack:"200Mbps", _next:addDaysIso(t,20)}
+    ];
+  }
+
+  let toastTimer;
+  function toast(msg, isErr){
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = 'toast'; }, 4500);
+  }
+
+  function cardHtml(c, today, locked){
+    const key = keyOf(c.cust_name);
+    const d = drafts[key] || {};
+    const date = d.date || today;
+    const pack = (d.pack && findPack(d.pack)) || findPack(c.pack_name) || findPack(c._last_pack) || packs[0];
+    const packOpts = packs.map(p =>
+      `<option value="${esc(p.pack_name)}"${pack && p.pack_name === pack.pack_name ? ' selected' : ''}>${esc(p.pack_name)} · ${fmtPrice(p.pack_price)}</option>`).join('');
+    const details = Object.keys(c)
+      .filter(k => !k.startsWith('_') && k !== 'cust_name' && String(c[k]) !== '')
+      .map(k => `<span><b>${esc(k.replace(/_/g, ' '))}</b>${esc(c[k])}</span>`).join('');
+
+    let chip;
+    if (locked){
+      const left = isoToDay(c._next) - isoToDay(today);
+      chip = `<span class="chip lock">Locked · ${left} day${left === 1 ? '' : 's'} left · next from ${fmtIso(c._next)}</span>`;
+    } else if (c._last){
+      chip = `<span class="chip ok">Available · last ${fmtIso(c._last)}${c._last_pack ? ' · ' + esc(c._last_pack) : ''}</span>`;
+    } else {
+      chip = `<span class="chip ok">Available · new customer</span>`;
+    }
+
+    const min = !locked && c._next ? ` min="${c._next}"` : '';
+    const dis = (locked || !packs.length) ? ' disabled' : '';
+    return `
+      <div class="cust-card${locked ? ' is-locked' : ''}" data-key="${esc(key)}">
+        <div class="cust-main">
+          <div class="cust-name">${esc(c.cust_name)}</div>
+          ${details ? `<div class="cust-details">${details}</div>` : ''}
+          <div class="cust-chip-row">${chip}</div>
+        </div>
+        <div class="cust-controls">
+          <input type="date" class="cust-date" value="${esc(date)}"${min}${dis} aria-label="Subscription date">
+          <select class="cust-pack"${dis} aria-label="Pack">${packOpts}</select>
+          <button type="button" class="cust-btn"${dis}>Subscribe</button>
+          <div class="cust-msg"></div>
+        </div>
+      </div>`;
+  }
+
+  // Enables/disables the Subscribe button for one card based on the chosen date.
+  function updateCardState(card){
+    const c = customers.find(x => keyOf(x.cust_name) === card.dataset.key);
+    if (!c || card.classList.contains('is-locked')) return;
+    const date = card.querySelector('.cust-date').value;
+    let msg = '';
+    if (!date) msg = 'Pick a date';
+    else if (c._next && date < c._next) msg = 'Not before ' + fmtIso(c._next);
+    card.querySelector('.cust-msg').textContent = msg;
+    card.querySelector('.cust-btn').disabled = !!msg || !packs.length;
+  }
+
+  function renderCustomers(force){
+    if (!customersLoaded){
+      custList.innerHTML = '<div class="loading">Loading customers…</div>';
+      return;
+    }
+    const today = todayIso();
+    const sig = JSON.stringify([customers, packs, customersFound, custSearchEl.value, today]);
+    if (!force){
+      if (sig === custSig) return;                           // nothing changed
+      if (custList.contains(document.activeElement)) return; // don't yank a control the user is using
+    }
+    custSig = sig;
+
+    if (!customersFound){
+      custSummary.textContent = '';
+      custList.innerHTML = '<div class="empty">No <b>Customers</b> sheet found. Add a sheet named “Customers” with a <b>cust_name</b> column — see SETUP_INSTRUCTIONS.md.</div>';
+      return;
+    }
+
+    const lockedCount = customers.filter(c => isLocked(c, today)).length;
+    custSummary.innerHTML = `<b>${customers.length}</b> customers · <b>${customers.length - lockedCount}</b> available · <b>${lockedCount}</b> locked`;
+
+    const q = custSearchEl.value.trim().toLowerCase();
+    let list = customers.filter(c => !q || Object.keys(c).some(k => !k.startsWith('_') && String(c[k]).toLowerCase().includes(q)));
+    // available customers on top, locked ones below (same idea as unpaid-first on Payments)
+    list = list.slice().sort((a, b) => isLocked(a, today) - isLocked(b, today));
+
+    if (!list.length){
+      custList.innerHTML = `<div class="empty">${customers.length ? 'No customers match.' : 'No customers yet — add rows to the Customers sheet.'}</div>`;
+      return;
+    }
+    custList.innerHTML = list.map(c => cardHtml(c, today, isLocked(c, today))).join('');
+    custList.querySelectorAll('.cust-card').forEach(updateCardState);
+  }
+
+  async function onSubscribe(card, btn){
+    const key = card.dataset.key;
+    const c = customers.find(x => keyOf(x.cust_name) === key);
+    const date = card.querySelector('.cust-date').value;
+    const pack = findPack(card.querySelector('.cust-pack').value);
+    if (!c || !pack || !date) return;
+
+    const sure = confirm(`Subscribe ${c.cust_name}?\n\nPack: ${pack.pack_name} (${fmtPrice(pack.pack_price)})\nDate: ${fmtIso(date)}\n\nThis customer will be locked for ${lockDays} days.`);
+    if (!sure) return;
+
+    if (!SCRIPT_URL){
+      toast('Demo mode — nothing was saved. Connect your sheet to save.', true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    let out = null, netErr = false;
+    try{
+      const res = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'subscribe', cust_name: c.cust_name, date: date, pack_name: pack.pack_name})
+      });
+      try{ out = await res.json(); }catch(_){ /* unreadable reply — verified below */ }
+    }catch(err){
+      netErr = true;
+      console.error(err);
+    }
+
+    await loadData(true);   // pull the fresh state (the new row shows up in Payments too)
+    const now = customers.find(x => keyOf(x.cust_name) === key);
+    const saved = (out && out.status === 'ok') || (!out && now && now._last === date);
+
+    if (saved){
+      delete drafts[key];
+      toast(`Subscribed ✓  ${c.cust_name} · ${pack.pack_name} · ${fmtIso(date)}`);
+    } else if (out && (out.status === 'blocked' || out.status === 'error')){
+      toast(out.message || 'Could not save.', true);
+    } else {
+      toast(netErr ? 'Could not reach the sheet.' : 'Not saved — please try again.', true);
+    }
+    renderCustomers(true);
+  }
+
+  custList.addEventListener('change', e => {
+    const card = e.target.closest('.cust-card');
+    if (!card || !e.target.matches('.cust-date, .cust-pack')) return;
+    drafts[card.dataset.key] = { date: card.querySelector('.cust-date').value, pack: card.querySelector('.cust-pack').value };
+    updateCardState(card);
+  });
+  custList.addEventListener('click', e => {
+    const btn = e.target.closest('.cust-btn');
+    if (!btn || btn.disabled) return;
+    onSubscribe(btn.closest('.cust-card'), btn);
+  });
+  custSearchEl.addEventListener('input', () => renderCustomers(true));
+  custRefreshBtn.addEventListener('click', async () => { await loadData(false); renderCustomers(true); });
+
+  // ---- Tabs ----
+  const tabButtons = document.querySelectorAll('.tab');
+  const views = { payments: document.getElementById('view-payments'), customers: document.getElementById('view-customers') };
+  function showView(name){
+    if (!views[name]) name = 'payments';
+    Object.keys(views).forEach(k => { views[k].hidden = (k !== name); });
+    tabButtons.forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === name)));
+    try{ history.replaceState(null, '', '#' + name); }catch(_){}
+    if (name === 'customers') renderCustomers(true);
+  }
+  tabButtons.forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+  window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+  showView(location.hash.slice(1));
 
   refreshBtn.addEventListener('click', () => loadData(false));
   monthFilter.addEventListener('change', applyFilters);
